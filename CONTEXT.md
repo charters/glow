@@ -142,94 +142,109 @@ PWA installs via Safari → Add to Home Screen. Runs offline via service worker.
 
 | Layer | Choice | Rationale |
 |---|---|---|
-| Framework | React + Vite | Fast, modern, excellent PWA plugin support |
-| Language | TypeScript | Type safety for data model |
-| Storage | IndexedDB via Dexie.js | Persistent local storage, no server needed, offline-first |
+| Framework | React 19 + Vite 8 | Fast, modern toolchain |
+| Language | TypeScript 6 | Type safety for data model |
+| Storage | IndexedDB via Dexie.js 4 | Persistent local storage, no server needed, offline-first |
 | Styling | CSS (custom properties + gradients) | Full access to gradients, backdrop-filter, animations for glow aesthetic |
-| PWA | vite-plugin-pwa | Auto-generates service worker + manifest |
-| Deployment | Any static host (Vercel/Netlify) or localhost tunnel | User accesses via URL, adds to home screen |
+| PWA | Manual (sw.js + manifest.json) | vite-plugin-pwa was incompatible with Vite 8; hand-rolled service worker and manifest |
+| Deployment | GitHub Pages via GitHub Actions | Auto-deploys on push to main. URL: https://charters.github.io/glow/ |
+| Source | https://github.com/charters/glow (public) | GitHub Actions workflow builds + deploys |
 
-### 4.3 Data Model
+### 4.3 Data Model (Actual — Dexie v2)
 
 **Habit**
 - id (auto-increment)
-- name (string)
-- type: "simple" | "ritual"
-- cadence: "daily" | "specific_days" | "weekly" | "biweekly" | "monthly"
-- specificDays?: number[] (0=Sun, 6=Sat — for "specific_days" cadence)
-- category?: string (household, self-care, health, custom)
-- triggerCue?: string (implementation intention — "When I...")
+- name: string
+- emoji: string (selected from tappable grid, not keyboard)
+- frequency: 'daily' | 'weekly' | 'biweekly' | 'xperweek'
+- dayOfWeek?: number (0=Sun…6=Sat — for weekly/biweekly)
+- timesPerWeek?: number (1–7, for xperweek only)
+- isRitual: boolean
 - sortOrder: number
-- archived: boolean
-- createdAt: Date
+- createdAt: string (ISO)
 
 **RitualStep**
 - id (auto-increment)
-- habitId (foreign key → Habit)
-- name (string)
+- habitId: number (foreign key → Habit)
+- label: string
 - sortOrder: number
 
 **Completion**
 - id (auto-increment)
-- habitId (foreign key → Habit)
-- date (string, YYYY-MM-DD format)
-- completed: boolean (for simple habits)
-- completedSteps?: number[] (array of RitualStep ids, for rituals)
-- createdAt: Date
+- habitId: number (foreign key → Habit)
+- date: string (YYYY-MM-DD)
+- completedAt: string (ISO)
+- stepsCompleted?: number[] (ritual step IDs, for rituals)
+
+**Indexes:** `[habitId+date]` compound index on completions for fast lookups.
+
+**Note:** The original data model spec had fields like `type`, `cadence`, `specificDays`, `category`, `triggerCue`, `archived`. These were simplified during implementation. The current model above is what's actually in code.
 
 ### 4.4 Views
 
-#### Today (Primary — 95% of usage)
-- Shows only habits/rituals applicable to today (based on cadence)
-- Single tap to complete simple habits
+#### Today (Primary — 95% of usage) ✅ COMPLETE
+- Greeting with time-of-day awareness
+- Warmth meter at top (gradient bar showing today's completion ratio, pulse animation at 100%)
+- Only shows habits due today (based on frequency logic in `isDueToday()`)
+- Single tap to complete simple habits; card glows amber on completion
 - Rituals expand to show steps; tap individual steps for partial credit
-- Soft warmth indicator at top shows today's glow level building
-- Completed items stay visible but settled/dimmed
+- xperweek habits show weekly progress badge ("2/3 this week") and count toward warmth if done today
+- `.just-completed` pulse animation on toggle
 - Tap again to undo
 
-#### Calendar (Signature View)
-- Month grid with warmth/glow per day cell
-- Gradient: neutral → faint cream → peach → amber → bright golden
-- Today is outlined
-- Tap any day for detail popover (what was done, retroactive logging)
-- Swipe/arrows to navigate months
-- No streak counters anywhere
+#### Calendar (Signature View) ✅ COMPLETE
+- Month grid with warmth heat map per day cell
+- Gradient: transparent → cream → peach → amber → golden (0→1 warmth ratio)
+- Box-shadow glow on high-warmth cells
+- Today outlined with warm border
+- Tap any past day → DayDetail bottom sheet slides up
+- DayDetail allows viewing and retroactively toggling completions (simple habits + ritual steps)
+- Month navigation (‹/›) + tap month label to jump to current month
+- Future days are disabled/dimmed
+- Warmth computation handles rituals (step-level credit) and xperweek (any completion that day counts)
 
-#### Habits (Setup — Infrequent Use)
-- List of all habits/rituals grouped by category
-- Tap to edit: name, cadence, category, trigger cue
-- Tap ritual to edit steps, reorder, add/remove
-- Add new habit/ritual
-- Swipe to archive (not delete — history preserved)
+#### Habits (Setup — Infrequent Use) ✅ COMPLETE
+- List of all habits with emoji, name, frequency description
+- Add new habit form at bottom with:
+  - Tappable emoji grid (30 common emojis, no keyboard activation — avoids iOS keyboard covering fields)
+  - Name input
+  - Frequency selector: Daily / Weekly / Biweekly / X per week
+  - Day-of-week picker for weekly/biweekly
+  - Stepper (−/+, 1–7×) for xperweek
+  - Ritual toggle with dynamic step inputs
+- Inline edit: tap Edit button on card → form expands below that card (not at bottom)
+- Edit preserves all history (uses `db.habits.update()`, doesn't delete/recreate)
+- Delete: inside edit form, "Delete Habit" opens a modal overlay showing emoji, name, creation date, frequency, red warning, Keep / Delete Forever buttons
 
-#### Reflection (Optional Monthly Summary)
+#### Reflect (Monthly Summary) ⬜ NOT STARTED (placeholder in tab bar)
+Planned features from design spec:
 - Warm days count: "You had 19 warm days in March"
 - Warmth trend sparkline month-over-month
 - Strongest habits view
 - Ritual step insights (which steps tend to get skipped)
 - No scoring, no grades, no prominent percentages
 
-#### Navigation
+#### Navigation ✅ COMPLETE
 ```
 ┌─────────────────────────────┐
 │        Active View          │
 │        (full screen)        │
 ├─────────────────────────────┤
-│  Today  Calendar  Habits  ☽ │
+│  ☀️ Today  📅 Cal  ⚙️ Habits  💭 │
 └─────────────────────────────┘
 ```
-Four tabs, no hamburger menus. ☽ = Reflection.
+Four emoji tabs. Active tab has warm glow underline.
 
 ---
 
 ## 5. Build Phases
 
-| Phase | Scope | Outcome |
+| Phase | Scope | Status |
 |---|---|---|
-| 1 | Vite + React scaffold, data model (Dexie/IndexedDB), service worker, PWA manifest, Today view with starter habits | Installable app on phone, can mark habits done |
-| 2 | Calendar view with glow rendering, tap-day detail, retroactive logging | Core visual experience |
-| 3 | Habits view — create, edit, set cadence, build rituals with steps | Full self-service, no hard-coded data |
-| 4 | Reflection view, glow animations, dark mode, polish | Complete app |
+| 1 | Vite + React scaffold, data model (Dexie/IndexedDB), service worker, PWA manifest, Today view with starter habits | ✅ Complete |
+| 2 | Calendar view with glow rendering, tap-day detail, retroactive logging | ✅ Complete |
+| 3 | Habits view — create, edit, set cadence, build rituals with steps, delete with confirmation | ✅ Complete |
+| 4 | Reflection view, export/import backup, glow animations, polish | ⬜ Not started |
 
 ---
 
@@ -257,3 +272,103 @@ Four tabs, no hamburger menus. ☽ = Reflection.
 - Polivy, J. & Herman, C. P. (2020). "Overeating in Restrained and Unrestrained Eaters." *Frontiers in Nutrition*, 7, 30. (What-the-hell effect)
 - Stawarz, K., Cox, A. L., & Blandford, A. (2015). "Beyond Self-Tracking and Reminders." *CHI 2015*, 2653–2662.
 - Locke, E. A. & Latham, G. P. (2002). "Building a practically useful theory of goal setting." *American Psychologist*, 57(9), 705–717.
+
+---
+
+## 8. Implementation Details
+
+### 8.1 File Map
+
+| File | Purpose |
+|---|---|
+| `src/db.ts` | Dexie database v2, TypeScript interfaces, `isDueToday()`, `weekDateKeys()`, `getWeekCompletionCount()`, `seedIfEmpty()` |
+| `src/TodayView.tsx` | Greeting, warmth meter, habit cards with glow, ritual step expansion, xperweek weekly progress badge, `isDoneForToday()` for warmth bar |
+| `src/HabitsView.tsx` | Habit list, inline edit form, emoji grid picker, frequency selector with xperweek stepper, delete modal overlay |
+| `src/CalendarView.tsx` | Month grid, warmth heat map computation (`computeWarmth()`), month navigation, DayDetail integration |
+| `src/DayDetail.tsx` | Bottom sheet overlay for tapping calendar days — view and retroactively toggle completions |
+| `src/App.tsx` | App shell with 4-tab navigation, calls `seedIfEmpty()` on mount |
+| `src/App.css` | All component styles — dark theme, glow effects, animations (warmPulse, just-completed, slideUp, fadeIn) |
+| `src/index.css` | CSS variables (--bg-deep: #0d0d1a, --glow-warm: #ff8c42, etc.) and global resets |
+| `src/main.tsx` | React root render + SW registration (path: `/glow/sw.js`) |
+| `index.html` | PWA meta tags (apple-mobile-web-app-capable, theme-color, viewport-fit=cover), all href paths use `/glow/` base |
+| `public/manifest.json` | PWA manifest (name: Glow, standalone, dark theme, start_url: `/glow/`) |
+| `public/sw.js` | Service worker — network-first with cache fallback, versioned cache 'glow-v1' |
+| `public/icon.svg` | App icon — radial gradient orange glow circle on dark background |
+| `vite.config.ts` | Vite config with `base: '/glow/'` for GitHub Pages |
+| `.github/workflows/deploy.yml` | GitHub Actions workflow: npm ci → npm run build → upload-pages-artifact → deploy-pages |
+| `CONTEXT.md` | This file |
+
+### 8.2 Key Implementation Patterns
+
+**Warmth bar (TodayView):** `isDoneForToday()` checks if the habit has a completion for today. For xperweek habits, it counts as done for warmth if today has a completion — it doesn't wait for the weekly goal to be fully met. This means checking off a 3×/week habit contributes to today's warmth immediately.
+
+**xperweek frequency:** Shows every day (isDueToday returns true). Card shows "2/3 this week" badge. Once weekly goal is met, treated as fully done. Uses `weekDateKeys()` + `getWeekCompletionCount()` to query completions for Sun–Sat of current week.
+
+**Calendar warmth computation:** `computeWarmth(dateKey, date, habits, completionsByDate, ritualStepsMap)` returns 0–1 ratio. -1 means nothing was due that day. Rituals contribute step-level granularity (3/5 steps = 0.6 credit). Colors scale through transparent → cream → peach → amber → golden.
+
+**Emoji picker:** Uses a tappable grid of 30 hardcoded emojis instead of a text input. This avoids the iOS keyboard sliding up and hiding form fields on Safari PWA.
+
+**Inline edit:** When editing a habit, the edit form expands below that specific habit card (tracked via `editingId` state), rather than scrolling to a bottom form.
+
+**Delete flow:** Delete button inside edit form → modal overlay with habit details (emoji, name, creation date, frequency) → "Keep" / "Delete Forever" buttons. Deletion removes the habit, all its completions, and all ritual steps.
+
+**Biweekly scheduling:** Uses anchor date (habit.createdAt). Calculates weeks since anchor's week start. If (weeks % 2 === 0) and day-of-week matches, habit is due. This ensures consistent biweekly cadence regardless of when you check.
+
+### 8.3 CSS Theme
+
+Dark background (#0d0d1a) with warm amber/golden glow effects. Key variables:
+- `--bg-deep: #0d0d1a` (main background)
+- `--bg-card: #1a1a2e` (card surfaces)
+- `--glow-warm: #ff8c42` (primary warm glow)
+- `--glow-gold: #ffb347` (golden accents)
+- `--text-primary: #e8e0d4` (warm white text)
+- `--text-muted: #8a8078` (dimmed text)
+
+### 8.4 PWA Configuration
+
+- **Base path:** `/glow/` (required for GitHub Pages since it's at `charters.github.io/glow/`)
+- **All asset paths in index.html, manifest.json, and main.tsx use `/glow/` prefix**
+- Service worker registered at `/glow/sw.js`
+- Manifest start_url: `/glow/`
+- Icon src: `/glow/icon.svg`
+- If ever moving to a root domain, change `base` in vite.config.ts to `/` and update all `/glow/` references back to `/`
+
+---
+
+## 9. Deployment
+
+### 9.1 Current Setup
+- **URL:** https://charters.github.io/glow/
+- **Repo:** https://github.com/charters/glow (public)
+- **Deploy mechanism:** GitHub Actions workflow (`.github/workflows/deploy.yml`) triggers on push to `main`
+- **GitHub Pages source:** GitHub Actions (not "Deploy from branch")
+- **Build:** `npm ci` → `npm run build` (tsc + vite build) → uploads `dist/` as pages artifact
+
+### 9.2 Deploy Workflow
+Push to main → GitHub Actions runs → builds → deploys to Pages. Automatic, no manual steps.
+
+### 9.3 Local Dev
+```bash
+cd c:\Users\alcharte\Projects\glow
+npm run dev -- --host    # accessible on local network for phone testing
+```
+Dev server typically at `http://192.168.0.161:5173` (or next available port).
+
+### 9.4 iPhone Install
+1. Open https://charters.github.io/glow/ in Safari
+2. Tap Share → Add to Home Screen
+3. App runs standalone (no Safari chrome)
+
+---
+
+## 10. Remaining Work
+
+### Phase 4 Items
+- **Reflect view:** Monthly summary with warm day count, warmth trends, strongest habits, ritual step insights
+- **Export/import backup:** Critical before serious piloting — IndexedDB is local-only, Safari can evict storage. Recommended: JSON export from Habits or Reflect tab, import to restore
+- **Polish:** Glow animations, transitions, subtle haptic-like feedback
+
+### Known Considerations
+- **Data is device-local only.** IndexedDB on iPhone Safari. No cloud sync. Phone is single source of truth.
+- **Safari can evict IndexedDB** if device is low on storage and app hasn't been used in a while. Export/import feature mitigates this.
+- **No multi-device sync.** Firefox on PC and Safari on iPhone are completely separate databases.
