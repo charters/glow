@@ -3,7 +3,6 @@ import {
   db,
   toDateKey,
   isDueToday,
-  weekDateKeys,
   type Habit,
   type Completion,
   type RitualStep,
@@ -33,7 +32,6 @@ function computeWarmth(
   date: Date,
   habits: Habit[],
   completionsByDate: Map<string, Completion[]>,
-  weekCompletionCounts: Map<string, Map<number, number>>, // weekKey -> habitId -> count
   ritualStepsMap: Map<number, RitualStep[]>,
 ): number {
   const due = habits.filter((h) => isDueToday(h, date));
@@ -93,9 +91,6 @@ export default function CalendarView() {
   const [ritualStepsMap, setRitualStepsMap] = useState<
     Map<number, RitualStep[]>
   >(new Map());
-  const [weekCompCounts] = useState<Map<string, Map<number, number>>>(
-    new Map(),
-  );
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const todayKey = toDateKey(new Date());
@@ -206,7 +201,6 @@ export default function CalendarView() {
                 cellDate,
                 habits,
                 completionsByDate,
-                weekCompCounts,
                 ritualStepsMap,
               );
 
