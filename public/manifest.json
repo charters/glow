@@ -2,13 +2,13 @@
   "name": "Glow",
   "short_name": "Glow",
   "description": "A warm habit tracker that celebrates your wins",
-  "start_url": "/",
+  "start_url": "/glow/",
   "display": "standalone",
   "background_color": "#0d0d1a",
   "theme_color": "#0d0d1a",
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "/glow/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
