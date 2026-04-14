@@ -790,6 +790,77 @@
   text-align: center;
 }
 
+/* ── Ritual toggle & step editor ── */
+.ritual-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 4px;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.ritual-toggle-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--glow-warm);
+  cursor: pointer;
+}
+
+.step-editor {
+  padding: 8px 0;
+}
+
+.step-editor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.step-number {
+  color: var(--text-muted);
+  font-size: 14px;
+  min-width: 18px;
+  text-align: right;
+}
+
+.step-input {
+  flex: 1;
+}
+
+.step-remove-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.step-remove-btn:active {
+  background: rgba(255, 100, 100, 0.15);
+  color: #ff6b6b;
+}
+
+.step-add-btn {
+  background: none;
+  border: 1px dashed var(--text-muted);
+  color: var(--text-muted);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.step-add-btn:active {
+  border-color: var(--glow-warm);
+  color: var(--glow-warm);
+}
+
 /* ── Week progress badge ── */
 .habit-name-col {
   flex: 1;

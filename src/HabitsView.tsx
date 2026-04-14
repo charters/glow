@@ -34,6 +34,8 @@ export default function HabitsView() {
   const [frequency, setFrequency] = useState<Habit['frequency']>('daily');
   const [dayOfWeek, setDayOfWeek] = useState(1);
   const [timesPerWeek, setTimesPerWeek] = useState(3);
+  const [isRitual, setIsRitual] = useState(false);
+  const [stepLabels, setStepLabels] = useState<string[]>([]);
   const [deletingHabit, setDeletingHabit] = useState<Habit | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const editFormRef = useRef<HTMLFormElement>(null);
@@ -78,6 +80,8 @@ export default function HabitsView() {
     setFrequency('daily');
     setDayOfWeek(1);
     setTimesPerWeek(3);
+    setIsRitual(false);
+    setStepLabels([]);
     setShowForm(true);
   }
 
@@ -90,6 +94,9 @@ export default function HabitsView() {
     setFrequency(h.frequency);
     setDayOfWeek(h.dayOfWeek ?? 1);
     setTimesPerWeek(h.timesPerWeek ?? 3);
+    setIsRitual(h.isRitual);
+    const existingSteps = steps.get(h.id!) ?? [];
+    setStepLabels(existingSteps.map((s) => s.label));
   }
 
   async function saveHabit(e: React.FormEvent) {
@@ -104,16 +111,35 @@ export default function HabitsView() {
       timesPerWeek: frequency === 'xperweek' ? timesPerWeek : undefined,
     };
 
+    const ritualFlag = isRitual && stepLabels.filter((s) => s.trim()).length > 0;
+    data.isRitual = ritualFlag;
+
     if (editingId != null) {
       // Update existing — keeps all completions intact
       await db.habits.update(editingId, data);
+      // Rebuild ritual steps
+      await db.ritualSteps.where('habitId').equals(editingId).delete();
+      if (ritualFlag) {
+        await db.ritualSteps.bulkAdd(
+          stepLabels
+            .filter((s) => s.trim())
+            .map((label, i) => ({ habitId: editingId, label: label.trim(), sortOrder: i })),
+        );
+      }
     } else {
-      await db.habits.add({
+      const newId = await db.habits.add({
         ...data,
-        isRitual: false,
+        isRitual: ritualFlag,
         sortOrder: habits.length,
         createdAt: new Date().toISOString(),
       } as Habit);
+      if (ritualFlag) {
+        await db.ritualSteps.bulkAdd(
+          stepLabels
+            .filter((s) => s.trim())
+            .map((label, i) => ({ habitId: newId as number, label: label.trim(), sortOrder: i })),
+        );
+      }
     }
 
     setShowForm(false);
@@ -204,6 +230,55 @@ export default function HabitsView() {
             </div>
           )}
         </div>
+
+        <label className="form-label ritual-toggle-label">
+          <input
+            type="checkbox"
+            checked={isRitual}
+            onChange={(e) => {
+              setIsRitual(e.target.checked);
+              if (e.target.checked && stepLabels.length === 0) setStepLabels(['']);
+            }}
+          />
+          This is a ritual (has steps)
+        </label>
+
+        {isRitual && (
+          <div className="step-editor">
+            <label className="form-label">Steps</label>
+            {stepLabels.map((label, i) => (
+              <div key={i} className="step-editor-row">
+                <span className="step-number">{i + 1}.</span>
+                <input
+                  className="form-input step-input"
+                  placeholder={`Step ${i + 1}`}
+                  value={label}
+                  onChange={(e) => {
+                    const copy = [...stepLabels];
+                    copy[i] = e.target.value;
+                    setStepLabels(copy);
+                  }}
+                />
+                <button
+                  type="button"
+                  className="step-remove-btn"
+                  onClick={() => setStepLabels(stepLabels.filter((_, j) => j !== i))}
+                  aria-label="Remove step"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="step-add-btn"
+              onClick={() => setStepLabels([...stepLabels, ''])}
+            >
+              + Add step
+            </button>
+          </div>
+        )}
+
         {isEdit && (
           <div className="delete-zone">
             <button
