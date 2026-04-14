@@ -11,8 +11,14 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: env(safe-area-inset-top, 0px) 20px 20px;
+  padding: 0 20px 20px;
   -webkit-overflow-scrolling: touch;
+}
+
+@media (display-mode: standalone) {
+  .app-content {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
 }
 
 /* ── Bottom Nav ── */
@@ -21,10 +27,17 @@
   justify-content: space-around;
   align-items: flex-start;
   padding-top: 6px;
-  padding-bottom: calc(6px + var(--safe-bottom));
+  padding-bottom: 6px;
   background: var(--bg-surface);
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   flex-shrink: 0;
+}
+
+/* Only add safe-area padding in standalone PWA mode (home indicator) */
+@media (display-mode: standalone) {
+  .nav {
+    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 .nav-item {
