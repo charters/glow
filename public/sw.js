@@ -1,4 +1,4 @@
-const CACHE = 'glow-v1';
+const CACHE = 'glow-v2';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
