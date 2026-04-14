@@ -231,17 +231,21 @@ export default function HabitsView() {
           )}
         </div>
 
-        <label className="form-label ritual-toggle-label">
-          <input
-            type="checkbox"
-            checked={isRitual}
-            onChange={(e) => {
-              setIsRitual(e.target.checked);
-              if (e.target.checked && stepLabels.length === 0) setStepLabels(['']);
+        <div className="ritual-toggle-row">
+          <span className="form-label">Ritual</span>
+          <button
+            type="button"
+            className={`toggle-switch${isRitual ? ' on' : ''}`}
+            onClick={() => {
+              const next = !isRitual;
+              setIsRitual(next);
+              if (next && stepLabels.length === 0) setStepLabels(['']);
             }}
-          />
-          This is a ritual (has steps)
-        </label>
+            aria-pressed={isRitual}
+          >
+            <span className="toggle-thumb" />
+          </button>
+        </div>
 
         {isRitual && (
           <div className="step-editor">
